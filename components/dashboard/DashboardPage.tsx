@@ -20,6 +20,7 @@ import { AssetVolumePanel } from "@/components/dashboard/AssetVolumePanel";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { DashboardSearch } from "@/components/dashboard/DashboardSearch";
 import { ComparisonPanel } from "@/components/dashboard/ComparisonPanel";
+import { SavedViewsControls } from "@/components/dashboard/SavedViewsControls";
 
 function DashboardContent() {
   const { selectedNode } = useDashboard();
@@ -64,6 +65,8 @@ function DashboardContent() {
       </header>
 
       <FreshnessWarning />
+
+      <SavedViewsControls />
 
       <DashboardSearch />
 
