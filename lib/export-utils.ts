@@ -223,3 +223,89 @@ export function getStructuredRowsForExport(
   }));
   return { rows, syntheticIdentifiers };
 }
+
+function escapePdfText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+/** Minimal single-page PDF (text only) — no third-party dependency. */
+export function buildTextPdf(lines: string[]): Blob {
+  const contentLines = lines.flatMap((line, index) => {
+    const y = 800 - index * 16;
+    return [`BT /F1 11 Tf 48 ${y} Td (${escapePdfText(line)}) Tj ET`];
+  });
+  const stream = contentLines.join("\n");
+  const objects = [
+    "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj",
+    "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj",
+    "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj",
+    `4 0 obj<< /Length ${stream.length} >>stream\n${stream}\nendstream endobj`,
+    "5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [0];
+  const byteLength = (value: string) => new TextEncoder().encode(value).length;
+  for (const object of objects) {
+    offsets.push(byteLength(pdf));
+    pdf += `${object}\n`;
+  }
+  const xrefStart = byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  for (let i = 1; i < offsets.length; i += 1) {
+    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+export type DashboardPdfInput = {
+  metadata: ExportMetadata;
+  kpiLines: string[];
+  chartTitle: string;
+  loading: boolean;
+};
+
+export function buildDashboardPdfDocument(input: DashboardPdfInput): Blob {
+  if (input.loading) {
+    throw new Error("Charts are still loading. Wait for data before exporting PDF.");
+  }
+  const periodLabel = input.metadata.period;
+  const dataThrough = input.metadata.freshness;
+  const lines = [
+    "LumenMap dashboard export",
+    `Period: ${periodLabel}`,
+    `Data through: ${dataThrough}`,
+    `Generated: ${input.metadata.generatedAt}`,
+    `View: ${input.metadata.view}`,
+    `Metric: ${input.metadata.metric}`,
+    "",
+    "KPI values",
+    ...input.kpiLines,
+    "",
+    `Active chart: ${input.chartTitle}`,
+    "",
+    "Source filters:",
+    ...Object.entries(input.metadata.filters).map(([key, value]) => `${key}=${value}`),
+  ];
+  return buildTextPdf(lines);
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.download = filename;
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}

@@ -4,12 +4,15 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDashboard } from "@/components/dashboard/DashboardProvider";
 import {
+  buildDashboardPdfDocument,
   buildExportMetadata,
+  downloadBlob,
   exportSvgToPng,
   exportToCsv,
   flattenTreemapForCsv,
   generateSafeFilename,
   getStructuredRowsForExport,
+  prefersReducedMotion,
 } from "@/lib/export-utils";
 import { TREEMAP_VIEWS } from "@/lib/constants";
 
@@ -18,7 +21,7 @@ interface ExportControlsProps {
 }
 
 export function ExportControls({ svgRef }: ExportControlsProps) {
-  const { data, period, treemapView } = useDashboard();
+  const { data, period, treemapView, isLoading, isFetching } = useDashboard();
 
   const activeView = TREEMAP_VIEWS.find((v) => v.id === treemapView);
   const viewLabel = activeView?.label || "Network Activity";
@@ -30,15 +33,13 @@ export function ExportControls({ svgRef }: ExportControlsProps) {
       if (svgRef?.current) {
         svgElement = svgRef.current;
       } else {
-        // Fallback: find the svg rendered by D3Treemap
         const container = document.querySelector(
-          '[data-treemap-container="true"] svg'
+          '[data-treemap-container="true"] svg',
         ) as SVGSVGElement | null;
         svgElement = container;
       }
 
       if (!svgElement) {
-        // Try broader selector in case of ref issues
         const allSvgs = document.querySelectorAll("svg[role='img']");
         if (allSvgs.length > 0) {
           svgElement = allSvgs[allSvgs.length - 1] as SVGSVGElement;
@@ -55,7 +56,7 @@ export function ExportControls({ svgRef }: ExportControlsProps) {
         "lumenmap-treemap",
         metadata.metric,
         period,
-        "png"
+        "png",
       );
 
       await exportSvgToPng(svgElement, filename, 2);
@@ -70,10 +71,9 @@ export function ExportControls({ svgRef }: ExportControlsProps) {
       const metadata = buildExportMetadata(data, period, treemapView, viewLabel);
       const { rows, syntheticIdentifiers } = getStructuredRowsForExport(
         data,
-        treemapView
+        treemapView,
       );
 
-      // Also provide flattened treemap data as alternative structured view
       let csvRows = rows;
       let filenamePrefix = "lumenmap-data";
 
@@ -89,13 +89,60 @@ export function ExportControls({ svgRef }: ExportControlsProps) {
         filenamePrefix,
         metadata.metric,
         period,
-        "csv"
+        "csv",
       );
 
       exportToCsv(csvRows, filename, metadata, syntheticIdentifiers);
     } catch (error) {
       console.error("CSV export failed:", error);
       alert("Failed to export CSV. Please try again.");
+    }
+  };
+
+  const handleExportPdf = () => {
+    try {
+      if (isLoading || isFetching || !data) {
+        alert("Charts are still loading. Wait for data before exporting PDF.");
+        return;
+      }
+
+      if (prefersReducedMotion()) {
+        document.documentElement.dataset.pdfExport = "reduced-motion";
+      }
+
+      const metadata = buildExportMetadata(data, period, treemapView, viewLabel);
+      const kpis = data.kpis as Record<string, unknown>;
+      const kpiLines = Object.entries(kpis)
+        .filter(([, value]) => typeof value === "number" || typeof value === "string")
+        .slice(0, 8)
+        .map(([key, value]) => `${key}: ${String(value)}`);
+
+      if (kpiLines.length === 0) {
+        kpiLines.push("KPI values unavailable");
+      }
+
+      const blob = buildDashboardPdfDocument({
+        metadata,
+        kpiLines,
+        chartTitle: viewLabel,
+        loading: false,
+      });
+      const filename = generateSafeFilename(
+        "lumenmap-dashboard",
+        metadata.metric,
+        period,
+        "pdf",
+      );
+      downloadBlob(blob, filename);
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to export PDF. Please try again.",
+      );
+    } finally {
+      delete document.documentElement.dataset.pdfExport;
     }
   };
 
@@ -120,6 +167,16 @@ export function ExportControls({ svgRef }: ExportControlsProps) {
       >
         <Download className="h-3.5 w-3.5" />
         Export CSV
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleExportPdf}
+        className="gap-1.5 text-xs"
+        title="Export KPI row, chart title, and freshness as PDF"
+      >
+        <Download className="h-3.5 w-3.5" />
+        Export PDF
       </Button>
     </div>
   );

@@ -4,6 +4,8 @@ import {
   generateSafeFilename,
   flattenTreemapForCsv,
   getStructuredRowsForExport,
+  buildDashboardPdfDocument,
+  buildTextPdf,
 } from "./export-utils";
 import type { TreemapNode } from "@/lib/types";
 
@@ -44,5 +46,54 @@ describe("export-utils", () => {
     const { rows, syntheticIdentifiers } = getStructuredRowsForExport(data as never, "events");
     assert.ok(Array.isArray(rows));
     assert.ok(syntheticIdentifiers.includes("other"));
+  });
+
+  test("buildTextPdf produces a PDF header", async () => {
+    const blob = buildTextPdf(["hello", "world"]);
+    const text = await blob.text();
+    assert.ok(text.startsWith("%PDF-1.4"));
+    assert.ok(text.includes("hello"));
+  });
+
+  test("buildDashboardPdfDocument fails while loading and names period in body", async () => {
+    assert.throws(
+      () =>
+        buildDashboardPdfDocument({
+          metadata: {
+            metric: "Network Activity",
+            unit: "operations",
+            period: "1d",
+            timezone: "UTC",
+            freshness: "2026-01-01T00:00:00.000Z",
+            filters: { period: "1d", view: "events", source: "fixture" },
+            generatedAt: "2026-01-02T00:00:00.000Z",
+            view: "events",
+          },
+          kpiLines: ["ops: 1"],
+          chartTitle: "Operation Types",
+          loading: true,
+        }),
+      /still loading/i,
+    );
+
+    const blob = buildDashboardPdfDocument({
+      metadata: {
+        metric: "Network Activity",
+        unit: "operations",
+        period: "1d",
+        timezone: "UTC",
+        freshness: "2026-01-01T00:00:00.000Z",
+        filters: { period: "1d", view: "events", source: "fixture" },
+        generatedAt: "2026-01-02T00:00:00.000Z",
+        view: "events",
+      },
+      kpiLines: ["ops: 12"],
+      chartTitle: "Operation Types",
+      loading: false,
+    });
+    const text = await blob.text();
+    assert.ok(text.includes("Period: 1d"));
+    assert.ok(text.includes("ops: 12"));
+    assert.ok(text.includes("Operation Types"));
   });
 });
