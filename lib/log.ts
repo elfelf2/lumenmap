@@ -10,6 +10,7 @@ export interface LogEntry {
   period?: string;
   queryName?: string;
   rowCount?: number;
+  bytesBilled?: number;
   cacheHit?: boolean;
   errorClass?: ErrorClass;
   errorMessage?: string;

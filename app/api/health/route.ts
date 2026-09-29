@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
-import { getBigQueryClient, hasBigQueryCredentials } from "@/lib/hubble/client";
+import {
+  getBigQueryClient,
+  hasBigQueryCredentials,
+  isFixtureMode,
+} from "@/lib/hubble/client";
 import { getCached } from "@/lib/hubble/cache";
+import {
+  getBytesBilledDegradedThreshold,
+  getBytesBilledWindowMinutes,
+  getRollingBytesBilled,
+} from "@/lib/hubble/bytes-billed-telemetry";
 import { getAllEntities } from "@/lib/entities/registry";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -40,6 +49,11 @@ type CheckResult = {
   status: "ok" | "degraded" | "unavailable";
   latencyMs: number;
   message: string;
+};
+
+type BytesBilledCheckResult = CheckResult & {
+  rollingBytesBilled: number;
+  windowMinutes: number;
 };
 
 async function withTimeout<T>(
@@ -163,6 +177,42 @@ function checkCache(): CheckResult {
   }
 }
 
+function checkBytesBilled(): BytesBilledCheckResult {
+  const start = Date.now();
+  const windowMinutes = getBytesBilledWindowMinutes();
+
+  if (isFixtureMode()) {
+    return {
+      status: "ok",
+      latencyMs: Date.now() - start,
+      message: "Fixture mode reports zero bytes billed",
+      rollingBytesBilled: 0,
+      windowMinutes,
+    };
+  }
+
+  const rollingBytesBilled = getRollingBytesBilled();
+  const threshold = getBytesBilledDegradedThreshold();
+
+  if (rollingBytesBilled > threshold) {
+    return {
+      status: "degraded",
+      latencyMs: Date.now() - start,
+      message: "Rolling BigQuery bytes billed exceeded configured threshold",
+      rollingBytesBilled,
+      windowMinutes,
+    };
+  }
+
+  return {
+    status: "ok",
+    latencyMs: Date.now() - start,
+    message: "Rolling BigQuery bytes billed within threshold",
+    rollingBytesBilled,
+    windowMinutes,
+  };
+}
+
 // ── Handler ────────────────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
@@ -186,8 +236,14 @@ export async function GET(request: Request) {
     checkDataFiles(),
     checkCache(),
   ]);
+  const bytesBilled = checkBytesBilled();
 
-  const checks = { bigquery: bq, dataFiles: data, cache };
+  const checks = {
+    bigquery: bq,
+    dataFiles: data,
+    cache,
+    bytesBilled,
+  };
   const anyUnavailable = Object.values(checks).some(
     (c) => c.status === "unavailable",
   );
@@ -220,6 +276,14 @@ export async function GET(request: Request) {
           status: cache.status,
           latencyMs: cache.latencyMs,
           message: cache.status !== "ok" ? cache.message : undefined,
+        },
+        bytesBilled: {
+          status: bytesBilled.status,
+          latencyMs: bytesBilled.latencyMs,
+          rollingBytesBilled: bytesBilled.rollingBytesBilled,
+          windowMinutes: bytesBilled.windowMinutes,
+          message:
+            bytesBilled.status !== "ok" ? bytesBilled.message : undefined,
         },
       },
     },

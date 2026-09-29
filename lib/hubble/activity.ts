@@ -2,6 +2,10 @@ import { getBigQueryClient } from "@/lib/hubble/client";
 import { getCached, setCache } from "@/lib/hubble/cache";
 import { getMaxBytesBilledLimit } from "@/lib/hubble/config";
 import {
+  extractTotalBytesBilled,
+  recordBytesBilled,
+} from "@/lib/hubble/bytes-billed-telemetry";
+import {
   BigQueryLimitExceededError,
   isBytesBilledLimitExceededError,
 } from "@/lib/hubble/errors";
@@ -113,11 +117,21 @@ async function runQuery<T>(
   const limit = getMaxBytesBilledLimit();
 
   try {
-    const [rows] = await client.query({
+    const [job] = await client.createQueryJob({
       query,
       params,
       maximumBytesBilled: limit.toString(),
     });
+    const [rows] = await job.getQueryResults();
+
+    let bytesBilled = 0;
+    try {
+      const [metadata] = await job.getMetadata();
+      bytesBilled = extractTotalBytesBilled(metadata);
+    } catch {
+      bytesBilled = 0;
+    }
+    recordBytesBilled(bytesBilled);
 
     logInfo({
       event: "activity.query.complete",
@@ -125,6 +139,7 @@ async function runQuery<T>(
       queryName: name,
       durationMs: endTimer(timer),
       rowCount: (rows as unknown[]).length,
+      bytesBilled,
     });
 
     return rows as T[];
