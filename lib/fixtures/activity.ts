@@ -6,6 +6,8 @@ import {
   getFixtureTimeseries,
 } from "@/lib/fixtures/timeseries";
 import { buildActivityMetricProvenance } from "@/lib/metrics/provenance";
+import type { DashboardNetworkId } from "@/lib/network";
+import { resolveDashboardNetwork } from "@/lib/network";
 import { resolvePeriod } from "@/lib/periods";
 import type { ActivityDataset, Period } from "@/lib/types";
 
@@ -17,8 +19,14 @@ import type { ActivityDataset, Period } from "@/lib/types";
  * Used when `LUMENMAP_DATA_SOURCE=fixture` (local development and the
  * Playwright e2e suite). Requires no GCP credentials and performs no
  * network calls: labels resolve from the local entity registry only.
+ *
+ * Pass `network` (or set `LUMENMAP_NETWORK=testnet`) to simulate testnet
+ * provenance metadata without changing fixture row values.
  */
-export function getFixtureActivityData(period: Period): ActivityDataset {
+export function getFixtureActivityData(
+  period: Period,
+  network: DashboardNetworkId = resolveDashboardNetwork(),
+): ActivityDataset {
   const raw = getFixtureRawActivity(period);
   const range = resolvePeriod(period);
 
@@ -53,6 +61,6 @@ export function getFixtureActivityData(period: Period): ActivityDataset {
     usdcCategories: [],
     usdcAccounts: [],
     timeseries: getFixtureTimeseries(period),
-    metricProvenance: buildActivityMetricProvenance(),
+    metricProvenance: buildActivityMetricProvenance(network),
   };
 }

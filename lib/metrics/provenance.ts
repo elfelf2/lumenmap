@@ -4,6 +4,12 @@ import {
   TOP_CONTRACTS_PER_FUNCTION,
   TOP_SOROBAN_FUNCTIONS,
 } from "@/lib/constants";
+import {
+  resolveDashboardNetwork,
+  resolveHubbleDataset,
+  toProvenanceNetwork,
+  type DashboardNetworkId,
+} from "@/lib/network";
 import type {
   ActivityMetricProvenance,
   CoverageConstraint,
@@ -20,7 +26,13 @@ const COMMON_COVERAGE: CoverageConstraint[] = [
   { kind: "source_lag", watermarkField: "sourceTimestamp" },
 ];
 
-export function buildActivityMetricProvenance(): ActivityMetricProvenance {
+export function buildActivityMetricProvenance(
+  network: DashboardNetworkId = resolveDashboardNetwork(),
+): ActivityMetricProvenance {
+  const provenanceNetwork = toProvenanceNetwork(network);
+  const dataset =
+    resolveHubbleDataset(network) || "crypto-stellar.crypto_stellar_dbt";
+
   return {
     operation_count: {
       metric: "operation_count",
@@ -31,7 +43,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
       },
       source: {
         provider: "hubble",
-        dataset: "crypto-stellar.crypto_stellar_dbt",
+        dataset,
         tables: [
           "enriched_history_operations",
           "enriched_history_operations_soroban",
@@ -45,7 +57,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
         dimensions: ["type_string"],
       },
       coverage: {
-        network: "stellar_mainnet",
+        network: provenanceNetwork,
         constraints: [
           ...COMMON_COVERAGE,
           {
@@ -82,7 +94,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
       },
       source: {
         provider: "hubble",
-        dataset: "crypto-stellar.crypto_stellar_dbt",
+        dataset,
         tables: ["enriched_history_operations"],
       },
       aggregation: {
@@ -92,7 +104,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
         dimensions: [],
       },
       coverage: {
-        network: "stellar_mainnet",
+        network: provenanceNetwork,
         constraints: [...COMMON_COVERAGE],
       },
     },
@@ -105,7 +117,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
       },
       source: {
         provider: "hubble",
-        dataset: "crypto-stellar.crypto_stellar_dbt",
+        dataset,
         tables: ["enriched_history_operations"],
       },
       aggregation: {
@@ -115,7 +127,7 @@ export function buildActivityMetricProvenance(): ActivityMetricProvenance {
         dimensions: ["type_string", "asset_identity"],
       },
       coverage: {
-        network: "stellar_mainnet",
+        network: provenanceNetwork,
         constraints: [
           ...COMMON_COVERAGE,
           {

@@ -101,7 +101,25 @@ Browser
   → labels from entities.json, Stellar Expert, Hubble home_domain
 ```
 
-Dataset: `crypto-stellar.crypto_stellar_dbt`
+Dataset: `crypto-stellar.crypto_stellar_dbt` (mainnet default)
+
+### Network toggle (mainnet / testnet)
+
+The dashboard header selects `mainnet` (default) or `testnet`. Selection is
+mirrored in the URL as `?network=testnet` and in activity API metadata as
+`metricProvenance.*.coverage.network` (`stellar_mainnet` | `stellar_testnet`).
+
+Dataset env overrides (never commit secrets):
+
+| Variable | Purpose |
+| --- | --- |
+| `LUMENMAP_NETWORK` | Default network (`mainnet` \| `testnet`); fixture mode can simulate testnet |
+| `LUMENMAP_BIGQUERY_DATASET` | Force dataset for any network (`project.dataset`) |
+| `LUMENMAP_MAINNET_BIGQUERY_DATASET` | Mainnet dataset override |
+| `LUMENMAP_TESTNET_BIGQUERY_DATASET` | Required for live testnet queries |
+
+Unsupported on testnet today: `usdc`, `xlm_volume`, `protocol_tvl` (UI shows an
+explicit disabled message). Ops / transactions remain available.
 
 ### Queries today
 

@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import {
   DashboardProvider,
   useDashboard,
@@ -21,9 +20,16 @@ import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { DashboardSearch } from "@/components/dashboard/DashboardSearch";
 import { ComparisonPanel } from "@/components/dashboard/ComparisonPanel";
 import { SavedViewsControls } from "@/components/dashboard/SavedViewsControls";
+import { NetworkSelector } from "@/components/dashboard/NetworkSelector";
+import {
+  isMetricSupportedOnNetwork,
+  networkLabel,
+  unsupportedMetricMessage,
+} from "@/lib/network";
 
 function DashboardContent() {
-  const { selectedNode } = useDashboard();
+  const { selectedNode, network, metric, setMetric } = useDashboard();
+  const metricSupported = isMetricSupportedOnNetwork(metric, network);
 
   return (
     <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-1 flex-col gap-6 overflow-x-hidden px-3 py-6 sm:px-6 lg:px-8">
@@ -43,10 +49,10 @@ function DashboardContent() {
                 LumenMap
               </h1>
               <p className="text-sm text-zinc-400">
-                Stellar network activity across mainnet.
+                Stellar network activity across {networkLabel(network).toLowerCase()}.
               </p>
             </div>
-            <Badge>Mainnet</Badge>
+            <NetworkSelector />
           </div>
           <FreshnessIndicator />
           <p className="text-xs text-zinc-500">
@@ -67,6 +73,22 @@ function DashboardContent() {
       <FreshnessWarning />
 
       <SavedViewsControls />
+
+      {!metricSupported && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-800/70 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
+        >
+          <p>{unsupportedMetricMessage(metric)}</p>
+          <button
+            type="button"
+            className="mt-2 text-sm font-medium text-amber-50 underline"
+            onClick={() => setMetric("ops")}
+          >
+            Switch to operations
+          </button>
+        </div>
+      )}
 
       <DashboardSearch />
 

@@ -6,11 +6,12 @@ export type StellarExpertEntityKind = "account" | "contract";
 const STRKEY_BODY = /^[A-Z2-7]+$/;
 
 /**
- * LumenMap dashboard is mainnet-only today ("Mainnet" badge).
- * Keep the helper centralized so testnet can be wired later without UI churn.
+ * Resolves Stellar Expert explorer network from the active dashboard network.
+ * Override with `LUMENMAP_NETWORK=testnet` (or UI selector → API `network`).
  */
 export function resolveStellarExpertNetwork(): StellarExpertNetwork {
-  return "public";
+  const fromEnv = process.env.LUMENMAP_NETWORK?.trim().toLowerCase();
+  return fromEnv === "testnet" ? "testnet" : "public";
 }
 
 export function isValidStellarAccountId(id: string): boolean {

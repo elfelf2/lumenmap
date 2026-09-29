@@ -38,6 +38,8 @@ interface DashboardContextValue {
   setTreemapView: (view: TreemapViewId) => void;
   metric: DashboardMetricId;
   setMetric: (metric: DashboardMetricId) => void;
+  network: import("@/lib/network").DashboardNetworkId;
+  setNetwork: (network: import("@/lib/network").DashboardNetworkId) => void;
   data?: ActivityVisualizationResponse;
   isLoading: boolean;
   isError: boolean;
@@ -57,8 +59,11 @@ const DashboardContext = createContext<DashboardContextValue | null>(null);
 
 async function fetchActivity(
   period: Period,
+  network: import("@/lib/network").DashboardNetworkId,
 ): Promise<ActivityVisualizationResponse> {
-  const response = await fetch(`/api/v1/activity?period=${period}`);
+  const params = new URLSearchParams({ period });
+  if (network !== "mainnet") params.set("network", network);
+  const response = await fetch(`/api/v1/activity?${params}`);
   if (!response.ok) {
     const body = (await response.json()) as ApiErrorResponse;
     throw new Error(body.message ?? "Failed to load activity data");
@@ -136,6 +141,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [comparePeriod, setComparePeriod] = useState<Period | null>(null);
   const [treemapView, setTreemapViewState] = useState<TreemapViewId>("events");
   const [metric, setMetricState] = useState<DashboardMetricId>("ops");
+  const [network, setNetworkState] =
+    useState<import("@/lib/network").DashboardNetworkId>("mainnet");
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
   const [activeLevelPath, setActiveLevelPath] = useState<TreemapNode[]>([]);
   const [focusRequest, setFocusRequest] = useState<SearchResult | null>(null);
@@ -154,6 +161,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       if (parsed.comparePeriod) setComparePeriod(parsed.comparePeriod);
       if (parsed.metric) setMetricState(parsed.metric);
       if (parsed.view) setTreemapViewState(parsed.view);
+      if (parsed.network) setNetworkState(parsed.network);
       setUrlReady(true);
     });
   }, []);
@@ -182,15 +190,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setMetricState(newMetric);
   }, []);
 
+  const handleSetNetwork = useCallback(
+    (next: import("@/lib/network").DashboardNetworkId) => {
+      setSelectedNode(null);
+      setActiveLevelPath([]);
+      setFocusRequest(null);
+      pendingPathSegments.current = null;
+      setNetworkState(next);
+    },
+    [],
+  );
+
   const query = useQuery({
-    queryKey: ["activity", period],
-    queryFn: () => fetchActivity(period),
+    queryKey: ["activity", period, network],
+    queryFn: () => fetchActivity(period, network),
     staleTime: 60_000,
   });
 
   const comparisonQuery = useQuery({
-    queryKey: ["activity", comparePeriod],
-    queryFn: () => fetchActivity(comparePeriod as Period),
+    queryKey: ["activity", comparePeriod, network],
+    queryFn: () => fetchActivity(comparePeriod as Period, network),
     enabled: comparePeriod !== null,
     staleTime: 60_000,
   });
@@ -214,6 +233,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       path: activeLevelPath,
       currentSearch: window.location.search,
       comparePeriod,
+      network,
     });
     if (next !== window.location.search) {
       window.history.replaceState(
@@ -222,7 +242,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         `${window.location.pathname}${next}`,
       );
     }
-  }, [urlReady, period, metric, treemapView, activeLevelPath, comparePeriod]);
+  }, [urlReady, period, metric, treemapView, activeLevelPath, comparePeriod, network]);
 
   const selectSearchResult = useCallback(
     (result: SearchResult) => {
@@ -247,6 +267,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setTreemapView: handleSetTreemapView,
       metric,
       setMetric: handleSetMetric,
+      network,
+      setNetwork: handleSetNetwork,
       data: query.data,
       isLoading: query.isLoading,
       isError: query.isError,
@@ -272,6 +294,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       handleSetTreemapView,
       metric,
       handleSetMetric,
+      network,
+      handleSetNetwork,
       query.data,
       query.isLoading,
       query.isError,

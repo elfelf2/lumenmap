@@ -130,12 +130,12 @@ export type MetricProvenance<M extends MetricId> = {
   methodology: MetricMethodology[M];
   source: {
     provider: "hubble";
-    dataset: "crypto-stellar.crypto_stellar_dbt";
+    dataset: string;
     tables: string[];
   };
   aggregation: MetricAggregation[M];
   coverage: {
-    network: "stellar_mainnet";
+    network: "stellar_mainnet" | "stellar_testnet";
     constraints: CoverageConstraint[];
   };
 };
@@ -468,7 +468,7 @@ export interface ActivityDataset
 export interface ApiErrorResponse {
   code: string;
   message: string;
-  supported?: Period[];
+  supported?: string[];
 }
 
 export interface SelectedNode {

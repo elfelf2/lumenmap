@@ -78,6 +78,7 @@ export type DashboardUrlState = {
   view?: TreemapViewId;
   pathSegments: string[];
   comparePeriod?: Period;
+  network?: "mainnet" | "testnet";
 };
 
 export function parseDashboardUrlSearch(
@@ -102,6 +103,9 @@ export function parseDashboardUrlSearch(
   const view = params.get("view");
   if (isValidTreemapView(view)) next.view = view;
 
+  const network = params.get("network");
+  if (network === "mainnet" || network === "testnet") next.network = network;
+
   return next;
 }
 
@@ -112,6 +116,7 @@ export function writeDashboardUrlSearch(input: {
   path: TreemapNode[];
   currentSearch?: string;
   comparePeriod?: Period | null;
+  network?: "mainnet" | "testnet";
 }): string {
   const params = new URLSearchParams(
     (input.currentSearch ?? "").replace(/^\?/, ""),
@@ -119,6 +124,11 @@ export function writeDashboardUrlSearch(input: {
   params.set("period", input.period);
   params.set("metric", input.metric);
   params.set("view", input.view);
+  if (input.network && input.network !== "mainnet") {
+    params.set("network", input.network);
+  } else {
+    params.delete("network");
+  }
   if (input.comparePeriod) params.set("compare", input.comparePeriod);
   else params.delete("compare");
 

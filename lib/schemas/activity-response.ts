@@ -247,7 +247,7 @@ const operationMetricProvenanceSchema = z.object({
     dimensions: z.array(z.string()).min(1),
   }),
   coverage: z.object({
-    network: z.literal("stellar_mainnet"),
+    network: z.enum(["stellar_mainnet", "stellar_testnet"]),
     constraints: z.array(coverageConstraintSchema).min(1),
   }),
 });
@@ -265,7 +265,7 @@ const assetVolumeMetricProvenanceSchema = z.object({
     dimensions: z.array(z.string()).min(1),
   }),
   coverage: z.object({
-    network: z.literal("stellar_mainnet"),
+    network: z.enum(["stellar_mainnet", "stellar_testnet"]),
     constraints: z.array(coverageConstraintSchema).min(1),
   }),
 });
@@ -283,7 +283,7 @@ const transactionCountMetricProvenanceSchema = z.object({
     dimensions: z.array(z.string()),
   }),
   coverage: z.object({
-    network: z.literal("stellar_mainnet"),
+    network: z.enum(["stellar_mainnet", "stellar_testnet"]),
     constraints: z.array(coverageConstraintSchema).min(1),
   }),
 });

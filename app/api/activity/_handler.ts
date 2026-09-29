@@ -12,6 +12,11 @@ import {
   logInfo,
   startTimer,
 } from "@/lib/log";
+import {
+  isDashboardNetworkId,
+  resolveDashboardNetwork,
+  type DashboardNetworkId,
+} from "@/lib/network";
 import { isValidPeriod, PERIOD_OPTIONS } from "@/lib/periods";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import {
@@ -27,7 +32,11 @@ import type {
   Period,
 } from "@/lib/types";
 
-export type ActivityFetcher = (period: Period) => Promise<ActivityDataset>;
+export type ActivityFetcher = (
+  period: Period,
+  correlationId?: string,
+  network?: DashboardNetworkId,
+) => Promise<ActivityDataset>;
 
 const SUPPORTED_PERIODS = PERIOD_OPTIONS.map((period) => period.value);
 
@@ -120,6 +129,17 @@ export async function handleActivityRequest(
   const timer = startTimer();
   const { searchParams } = new URL(request.url);
   const parsed = parseActivityPeriod(searchParams.get("period"));
+  const networkParam = searchParams.get("network");
+  if (networkParam !== null && !isDashboardNetworkId(networkParam)) {
+    const body: ApiErrorResponse = {
+      code: "INVALID_NETWORK",
+      message: "Unsupported network. Use mainnet or testnet.",
+      supported: ["mainnet", "testnet"],
+    };
+    recordActivityResponseSize(networkParam, "4xx", body);
+    return NextResponse.json(body, { status: 400 });
+  }
+  const network = resolveDashboardNetwork(networkParam);
 
   if (!parsed.ok) {
     recordActivityResponseSize(
@@ -157,7 +177,7 @@ export async function handleActivityRequest(
   }
 
   if (fetchActivityData === getActivityData && dataSourceMode === "fixture") {
-    const data = getFixtureActivityData(parsed.period);
+    const data = getFixtureActivityData(parsed.period, network);
     const validated = validateActivityResponse({
       ...toVisualizationResponse(data),
       source: "fixture",
@@ -176,7 +196,7 @@ export async function handleActivityRequest(
   }
 
   try {
-    const data = await fetchActivityData(parsed.period);
+    const data = await fetchActivityData(parsed.period, correlationId, network);
     const validated = validateActivityResponse(toVisualizationResponse(data));
     logInfo({
       event: "activity.request.complete",

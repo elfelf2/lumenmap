@@ -52,6 +52,10 @@ import {
 } from "@/lib/hubble/queries";
 import { hasBigQueryCredentials } from "@/lib/hubble/client";
 import {
+  isTestnetDatasetConfigured,
+  type DashboardNetworkId,
+} from "@/lib/network";
+import {
   buildAllTreemaps,
   buildKpis,
   buildProtocolSummary,
@@ -530,6 +534,7 @@ export function buildHeatmap(rawRows: HeatmapRawRow[]): ActivityHeatmap {
 export async function getActivityData(
   period: Period,
   correlationId: string = createCorrelationId(),
+  network: DashboardNetworkId = "mainnet",
 ): Promise<ActivityDataset> {
   if (!hasBigQueryCredentials()) {
     throw new Error(
@@ -537,8 +542,14 @@ export async function getActivityData(
     );
   }
 
+  if (!isTestnetDatasetConfigured(network)) {
+    throw new Error(
+      "Testnet BigQuery dataset is not configured. Set LUMENMAP_TESTNET_BIGQUERY_DATASET.",
+    );
+  }
+
   const range = resolvePeriod(period);
-  const cacheKey = `activity:v13:${period}:${range.start.toISOString()}`;
+  const cacheKey = `activity:v14:${network}:${period}:${range.start.toISOString()}`;
 
   const cached = getCached<ActivityDataset>(cacheKey, { track: true });
   if (cached) {
@@ -651,7 +662,7 @@ export async function getActivityData(
       protocols,
       timeseries,
       heatmap,
-      metricProvenance: buildActivityMetricProvenance(),
+      metricProvenance: buildActivityMetricProvenance(network),
     };
 
     setCache(cacheKey, response);
